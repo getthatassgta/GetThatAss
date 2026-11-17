@@ -564,7 +564,7 @@ const FX={water:1,sign:1,hair:1,speed:1,beat:1,eyes:1,look:1,breath:1,every:30,s
  const gl=cv.getContext("webgl",{antialias:false,alpha:false,premultipliedAlpha:false});
  if(!gl)return;                                   /* no WebGL -> static image stays */
  const VS="attribute vec2 a;varying vec2 v;void main(){v=vec2(a.x*.5+.5,.5-a.y*.5);gl_Position=vec4(a,0.,1.);}";
- const FS=`precision highp float;varying vec2 v;uniform sampler2D T;uniform sampler2D L;uniform sampler2D M;uniform float t,uW,uS,uH,uB,uE,uBr,uSm,uY,uHp,uSn,uKp,uKk;uniform vec3 uJg;uniform vec3 uHt;uniform vec2 uG;uniform sampler2D K;uniform sampler2D P;uniform sampler2D W;uniform vec3 uHl;uniform float uP,uBt,uRo;uniform vec4 uGl[4];
+ const FS=`precision highp float;varying vec2 v;uniform sampler2D T;uniform sampler2D L;uniform sampler2D M;uniform float t,uW,uS,uH,uB,uE,uBr,uSm,uY,uHp,uSn,uKp,uKk,uFx,uFc;uniform vec3 uJg;uniform vec3 uHt;uniform vec2 uG;uniform sampler2D K;uniform sampler2D P;uniform sampler2D W;uniform vec3 uHl;uniform float uP,uBt,uRo;uniform vec4 uGl[4];
  const vec2 R=vec2(1672.,941.);
  float hs(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
  float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
@@ -758,18 +758,24 @@ const FX={water:1,sign:1,hair:1,speed:1,beat:1,eyes:1,look:1,breath:1,every:30,s
   vec3 unlit=vec3(.28,.05,.14)+vec3(.10,.03,.05)*lum2;
   c=mix(c, mix(c*0.55, unlit, 0.45), tube*(1.-f));
   // stronger neon swell + extra punch on bass + hover pulse
-  float neonBoost = uB * (0.45 + 0.35 * f) + uHp * 0.7;
+  float hot=(uFc>-5.)?smoothstep(1.2,0.,abs(id-uFc))*step(.5,id):0.;   /* white-hot front running through the letters */
+  float neonBoost = uB * (0.45 + 0.35 * f) + uHp * 0.7 + uFx*1.1 + hot*1.6;
   c += c * neonBoost * smoothstep(.45,.88,lum2) * inq;
   // extra glow bloom when letters are bright (stronger pink on Buy hover)
   c += vec3(1.0,0.35,0.55) * tube * f * (uB * 0.18 + uHp * 0.45);
   // whole neon area gets a soft pink wash on hover
   c += vec3(1.0,0.25,0.55) * inq * uHp * 0.12;
+  c += vec3(1.0,0.45,0.72) * tube * (uFx*.7 + hot*1.0);                  /* surge: tubes overdrive */
+  c = mix(c, vec3(1.,.93,.97), clamp(tube*(hot*.55+uFx*.3),0.,1.));       /* ...and go white-hot */
+  c += vec3(1.0,0.2,0.5) * inq * (uFx*.2 + hot*.14);                     /* the whole board is lit by it */
   c+=c*uB*.35*glint*br*WM;                                       /* water glints on the bass */
     /* ---------- billboard blackout (click): the face goes dead black, glossy ---------- */
   if(uKk>.001){
     float bT=169.+.331*(p.x-829.),bB=381.+.18*(p.x-826.);
-    float fq=smoothstep(-1.,1.5,p.y-bT)*smoothstep(-1.,1.5,bB-p.y)*smoothstep(-1.5,1.,p.x-828.)*smoothstep(-1.5,1.,1046.-p.x);
-    float sd=smoothstep(-1.,1.5,p.y-(bT-1.))*smoothstep(-1.,1.5,(bB+1.)-p.y)*smoothstep(-1.5,1.,p.x-816.)*(1.-smoothstep(-1.5,1.,p.x-828.));
+    float qx=min(p.x-828.,1046.-p.x),qy=min(p.y-bT,bB-p.y);
+    vec2 rw=vec2(9.-qx,9.-qy);float dq=(qx<9.&&qy<9.)?9.-length(rw):min(qx,qy);
+    float fq=smoothstep(1.,3.,dq);                                   /* rounded like the real board, 2px inside the rim */
+    float sd=smoothstep(-1.,1.5,p.y-(bT+6.))*smoothstep(-1.,1.5,(bB-2.)-p.y)*smoothstep(-1.5,1.,p.x-818.)*(1.-smoothstep(-1.5,1.,p.x-829.));
     float gy=clamp((p.y-bT)/max(bB-bT,1.),0.,1.);
     vec3 blk=vec3(.010,.007,.014)+vec3(.030,.020,.040)*(1.-gy)*clamp((p.x-829.)/216.,0.,1.)*.55;
     c=mix(c,blk,clamp(fq,0.,1.)*uKk);
@@ -782,11 +788,11 @@ const FX={water:1,sign:1,hair:1,speed:1,beat:1,eyes:1,look:1,breath:1,every:30,s
  const vs=sh(gl.VERTEX_SHADER,VS),fs=sh(gl.FRAGMENT_SHADER,FS);if(!vs||!fs)return;
  const pr=gl.createProgram();gl.attachShader(pr,vs);gl.attachShader(pr,fs);gl.linkProgram(pr);
  if(!gl.getProgramParameter(pr,gl.LINK_STATUS))return;
- gl.useProgram(pr);
+ gl.useProgram(pr);gl.uniform1f(gl.getUniformLocation(pr,"uFc"),-9);gl.uniform1f(gl.getUniformLocation(pr,"uFx"),0);
  const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);
  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
  const al=gl.getAttribLocation(pr,"a");gl.enableVertexAttribArray(al);gl.vertexAttribPointer(al,2,gl.FLOAT,false,0,0);
- const U=n=>gl.getUniformLocation(pr,n),uB=U("uB"),uT=U("t"),uW=U("uW"),uS=U("uS"),uH=U("uH"),uE=U("uE"),uBr=U("uBr"),uJg=U("uJg"),uG=U("uG"),uSm=U("uSm"),uY=U("uY"),uHl=U("uHl"),uP=U("uP"),uBt=U("uBt"),uRo=U("uRo"),uHp=U("uHp"),uSn=U("uSn"),uGl=U("uGl[0]"),uKp=U("uKp"),uKk=U("uKk"),uHt=U("uHt");
+ const U=n=>gl.getUniformLocation(pr,n),uB=U("uB"),uT=U("t"),uW=U("uW"),uS=U("uS"),uH=U("uH"),uE=U("uE"),uBr=U("uBr"),uJg=U("uJg"),uG=U("uG"),uSm=U("uSm"),uY=U("uY"),uHl=U("uHl"),uP=U("uP"),uBt=U("uBt"),uRo=U("uRo"),uHp=U("uHp"),uSn=U("uSn"),uGl=U("uGl[0]"),uKp=U("uKp"),uKk=U("uKk"),uHt=U("uHt"),uFx=U("uFx"),uFc=U("uFc");
  const tex=gl.createTexture(),ltex=gl.createTexture(),im=new Image(),lim=new Image(),him=new Image(),mtex=gl.createTexture(),ktex=gl.createTexture(),kim=new Image(),ptex=gl.createTexture(),pim=new Image(),wtex=gl.createTexture(),wim=new Image();let ld=0;
  const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
  let t0=performance.now(),run=false;
@@ -855,7 +861,7 @@ const FX={water:1,sign:1,hair:1,speed:1,beat:1,eyes:1,look:1,breath:1,every:30,s
   gl.uniform1f(uT,tt);gl.uniform3f(uHt,tt*1.25,tt*2.3,tt*.55);eyes(tt);gl.uniform1f(uE,Math.min(1,ES.b*FX.eyes));gl.uniform2f(uG,ES.gx*FX.look,ES.gy*FX.look);gl.uniform1f(uSm,ES.sm*FX.smile);gl.uniform1f(uY,FX.sky);gl.uniform1f(uHp,hoverPulse);{const H=heli(tt);window.__heliPos=H;gl.uniform3f(uHl,H[0],H[1],H[2]*FX.heli)}gl.uniform1f(uRo,(tt*22*FX.rotor)%6.2831853);gl.uniform1f(uP,FX.palm);gl.uniform1f(uBt,FX.boat);gl.uniform1f(uBr,(Math.sin(tt*1.15)*.5+.5)*1.4*FX.breath);gl.uniform1f(uW,FX.water);gl.uniform1f(uS,FX.sign);gl.uniform1f(uH,FX.hair);gl.uniform1f(uB,(window.__bass||0)*FX.beat);{const J=window.__jg3||[0,0,0],B=FX.bounce;gl.uniform3f(uJg,J[0]*B,J[1]*B,J[2]*B);if(window.__tatSync)window.__tatSync(J[0]*B,J[1]*B,J[2]*B)}
   {const u=au.currentTime,sm=(a,b,x)=>{x=Math.max(0,Math.min(1,(x-a)/(b-a)));return x*x*(3-2*x)};   /* song 0:48: sun glare on her swells up, then eases off */
    gl.uniform1f(uSn,FX.sun*.9*sm(43,48,u)*(1-sm(53,62,u)))}
-  {const K=window.__bb||{p:1,k:0};gl.uniform1f(uKp,K.p);gl.uniform1f(uKk,K.k)}gulls(tt);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  {const K=window.__bb||{p:1,k:0};gl.uniform1f(uKp,K.p);gl.uniform1f(uKk,K.k);gl.uniform1f(uFx,K.fx||0);gl.uniform1f(uFc,K.fc===undefined?-9:K.fc)}gulls(tt);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
   if(run&&!reduce&&!document.hidden)requestAnimationFrame(draw);else if(run&&!reduce)document.addEventListener("visibilitychange",()=>requestAnimationFrame(draw),{once:true});
  }
 
@@ -866,7 +872,7 @@ const FX={water:1,sign:1,hair:1,speed:1,beat:1,eyes:1,look:1,breath:1,every:30,s
   gl.uniform1f(uT,tt);gl.uniform3f(uHt,ph[0],ph[1],ph[2]);gl.uniform1f(uE,o.blink||0);gl.uniform2f(uG,o.gx||0,o.gy||0);gl.uniform1f(uSm,o.smile||0);
   gl.uniform1f(uY,FX.sky);gl.uniform1f(uHp,0);gl.uniform3f(uHl,0,0,0);gl.uniform1f(uRo,0);gl.uniform1f(uP,FX.palm);gl.uniform1f(uBt,FX.boat);
   gl.uniform1f(uBr,(Math.sin(tt*1.15)*.5+.5)*1.4*FX.breath);gl.uniform1f(uW,FX.water);gl.uniform1f(uS,FX.sign);gl.uniform1f(uH,(o.hairAmp||1)*FX.hair);
-  gl.uniform1f(uB,0);gl.uniform3f(uJg,0,0,0);gl.uniform1f(uSn,o.sun||0);gl.uniform1f(uKp,1);gl.uniform1f(uKk,0);
+  gl.uniform1f(uB,0);gl.uniform3f(uJg,0,0,0);gl.uniform1f(uSn,o.sun||0);gl.uniform1f(uKp,1);gl.uniform1f(uKk,0);gl.uniform1f(uFx,0);gl.uniform1f(uFc,-9);
   GU.fill(0);gl.uniform4fv(uGl,GU);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);return cv;
  };
  function go(){if(++ld<6)return;
@@ -1118,6 +1124,7 @@ const COUNTDOWN={to:"2026-11-18T11:00:00Z",label:"Grand Theft Auto VI",note:"",d
  addEventListener("resize",refit);addEventListener("orientationchange",()=>setTimeout(refit,300));if(window.visualViewport)visualViewport.addEventListener("resize",refit);
  window.__bbSeek=(d,t)=>{cancelAnimationFrame(raf);dir=d;document.body.classList.add("bb-run");ov.classList.add("run");stage.style.transition="none";d>0?renderOpen(t):renderClose(t)};   /* debug: scrub the timeline */
  window.__bbOpen=open;window.__bbClose=close;window.__bbIsOpen=()=>st==="open";window.__bbUpd=upd;
+ window.__bbHomog=homog;window.__bbQ=Q;window.__bbState=()=>st;
 })();
 
 /* ===== background: muted looping video (grass + leaves swaying) ===== */
@@ -1332,7 +1339,7 @@ const BBVID="AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAvQbW9vdgAAAGxtdmhkAAA
 #fin.go #finR{animation:finS .7s steps(1) infinite}
 #fin.go #finB{animation:finS .7s steps(1) .35s infinite}
 @keyframes finS{0%{opacity:1}50%{opacity:0}}
-#finT{position:absolute;right:0;top:15vh;width:56vw;text-align:right;opacity:0;padding:3vh 4vw;background:linear-gradient(270deg,#150820d9 55%,transparent)}
+#finT{position:absolute;right:0;top:5vh;width:56vw;text-align:right;opacity:0;padding:3vh 4vw;background:linear-gradient(270deg,#150820d9 55%,transparent)}
 #finT.on{opacity:1}#finT.off{opacity:0;transition:opacity 1.2s}
 #finT h2{font:900 italic min(8vw,15vh)/.95 Montserrat,"Arial Black",Arial,sans-serif;letter-spacing:-.02em;white-space:nowrap}
 #finT h2 i{display:inline-block;font-style:italic;background:linear-gradient(180deg,#fff 10%,#ffb36a 55%,#ff3fa4);-webkit-background-clip:text;background-clip:text;color:transparent;opacity:0}
@@ -1417,6 +1424,32 @@ html.fshake #clip,html.fshake #bbs{animation:finShake .7s linear}
 @keyframes ringOut{0%{opacity:.95;transform:scale(.3)}100%{opacity:0;transform:scale(3.4)}}
 @keyframes ringIn{0%{opacity:0;transform:scale(3.6)}55%{opacity:.95}100%{opacity:0;transform:scale(.2)}}
 @media (prefers-reduced-motion:reduce){#finN[class^="n"]{animation:none!important;opacity:1}#finRing{display:none!important}}
+
+#bbFx{position:absolute;left:0;top:0;width:200px;height:180px;transform-origin:0 0;pointer-events:none;z-index:5;border-radius:9px;overflow:hidden}
+#bbFx i{position:absolute;inset:0;opacity:0}
+#bbFx .fl{background:radial-gradient(ellipse at 50% 55%,#fff 0,#ffd0ea 22%,#ff3fa4b0 52%,transparent 82%)}
+#bbFx .fl.go{animation:fxFl var(--d,.6s) ease-out both}
+@keyframes fxFl{0%{opacity:var(--a,1)}100%{opacity:0}}
+#bbFx .sw{background:linear-gradient(105deg,transparent 36%,#ff9ad655 45%,#fff 50%,#ff9ad655 55%,transparent 64%);transform:translateX(-110%)}
+#bbFx .sw.go{animation:fxSw .9s ease-in-out both}
+@keyframes fxSw{0%{opacity:1;transform:translateX(-110%)}85%{opacity:1}100%{opacity:0;transform:translateX(110%)}}
+#bbFx .gl{background:repeating-linear-gradient(0deg,#ff2a8a33 0 2px,transparent 2px 6px)}
+#bbFx .gl.go{animation:fxGl .35s steps(1) both}
+@keyframes fxGl{0%{opacity:.9;transform:translateX(-4px)}30%{opacity:0}50%{opacity:.8;transform:translateX(5px)}75%{opacity:.6}100%{opacity:0;transform:none}}
+/* ===== LAST 10 SECONDS ON THE BILLBOARD FACE (main scene): neon dies, numbers glow on the black board ===== */
+#bbFace{position:absolute;left:0;top:0;width:200px;height:180px;transform-origin:0 0;pointer-events:none;z-index:4;display:none;align-items:center;justify-content:center;overflow:hidden}
+#bbFace.on{display:flex}
+#bbFace b{display:block;font:900 italic 92px/1 Montserrat,"Arial Black",Arial,sans-serif;color:#ffe9f5;opacity:0;letter-spacing:-.03em;will-change:transform,opacity;
+ --g1:#ff9ad6;--g2:#ff3fa4;--g3:#ff3fa4cc;--g4:#d4177a;text-shadow:0 0 2px var(--g1),0 0 8px var(--g2),0 0 18px var(--g3),0 0 30px var(--g4)}
+#bbFace[data-s="3"] b{--g1:#ffc2a0;--g2:#ff7a3a;--g3:#ff4a2ecc;--g4:#c4301a}
+#bbFace[data-s="2"] b{--g1:#ffb0b0;--g2:#ff3a4a;--g3:#ff2147cc;--g4:#b00020}
+#bbFace[data-s="1"] b{--g1:#fff;--g2:#ffd0ea;--g3:#ff7cc4cc;--g4:#ff3fa4}
+#bbFace b.n10{animation:nN10 .95s linear both}#bbFace b.n9{animation:nN9 .95s linear both}
+#bbFace b.n8{animation:nN8 .95s cubic-bezier(.2,.9,.3,1) both}#bbFace b.n7{animation:nN7 .95s cubic-bezier(.15,.8,.25,1) both}
+#bbFace b.n6{animation:nN6 .95s cubic-bezier(.2,.9,.3,1) both}#bbFace b.n5{animation:nN5 .95s cubic-bezier(.3,.8,.2,1) both}
+#bbFace b.n4{animation:nN4 .95s cubic-bezier(.2,.9,.3,1) both}#bbFace b.n3{animation:nN3 .95s ease-out both}
+#bbFace b.n2{animation:nN2 .95s cubic-bezier(.2,.9,.3,1) both}#bbFace b.n1{animation:nN1 .95s cubic-bezier(.2,.8,.2,1) both}
+@media (prefers-reduced-motion:reduce){#bbFace b[class^="n"]{animation:none!important;opacity:1}}
 </style>
 <script>
 (function(){
@@ -1428,6 +1461,51 @@ html.fshake #clip,html.fshake #bbs{animation:finShake .7s linear}
  root.innerHTML='<div id="finF"></div><div id="finRing"></div><div id="finN"></div><div id="finT"><h2></h2><p></p></div>';
  document.body.appendChild(root);
  const N=root.querySelector("#finN"),T=root.querySelector("#finT"),RING=root.querySelector("#finRing");
+ /* ---- billboard face: numbers in art coordinates, warped onto the board quad ---- */
+ const stg=document.getElementById("stage"),FW=200,FH=180,FQ=[[839,181],[1036,246],[1036,410],[838,374]];   /* board face inset a few px so nothing touches the frame */
+ const face=document.createElement("div");face.id="bbFace";face.setAttribute("aria-hidden","true");
+ const fb=document.createElement("b");face.appendChild(fb);if(stg)stg.appendChild(face);
+ let faceOn=false,ramp=0,preOn=false;
+ function placeFace(){if(!window.__bbHomog)return;
+  const h=window.__bbHomog([[0,0],[FW,0],[FW,FH],[0,FH]],FQ);
+  face.style.transform="matrix3d("+h[0]+","+h[3]+",0,"+h[6]+","+h[1]+","+h[4]+",0,"+h[7]+",0,0,1,0,"+h[2]+","+h[5]+",0,1)"}
+ function faceStart(){if(faceOn)return;faceOn=true;placeFace();face.classList.add("on");cancelAnimationFrame(ramp);
+  const K=window.__bb;if(!K)return;const t0=performance.now(),p0=K.p;preOn=false;preP=1;K.fc=-9;K.hov=0;fxGo("fl",.9,".5s");fxGo("gl");
+  (function f(now){const x=Math.min(1,(now-t0)/450);K.p=p0*(1-x);K.k=x;K.fx=1-x;if(x<1&&faceOn)ramp=requestAnimationFrame(f);else K.fx=0})(t0)}
+ function faceStop(){if(!faceOn)return;faceOn=false;face.classList.remove("on");fb.className="";delete face.dataset.s;cancelAnimationFrame(ramp);
+  const K=window.__bb;if(!K)return;const t0=performance.now(),k0=K.k,p0=K.p;
+  (function f(now){if(faceOn)return;const x=Math.min(1,(now-t0)/700);K.k=k0*(1-x);K.p=p0+(1-p0)*(x<.3?x*.6:x);if(x<1)ramp=requestAnimationFrame(f);else{K.k=0;K.p=1}})(t0)}
+ /* overlay clipped to the board: white-pink flash, light sweep, scanline glitch */
+ const fx=document.createElement("div");fx.id="bbFx";fx.setAttribute("aria-hidden","true");fx.innerHTML='<i class="fl"></i><i class="sw"></i><i class="gl"></i>';if(stg)stg.appendChild(fx);
+ const FXQ=[[829,170],[1045,241],[1045,420],[828,381]];
+ function placeFx(){if(!window.__bbHomog)return;const h=window.__bbHomog([[0,0],[FW,0],[FW,FH],[0,FH]],FXQ);fx.style.transform="matrix3d("+h[0]+","+h[3]+",0,"+h[6]+","+h[1]+","+h[4]+",0,"+h[7]+",0,0,1,0,"+h[2]+","+h[5]+",0,1)"}
+ placeFx();
+ function fxGo(cls,a,d){const e=fx.querySelector("."+cls);if(!e)return;e.classList.remove("go");void e.offsetWidth;if(a!==undefined)e.style.setProperty("--a",a);if(d)e.style.setProperty("--d",d);e.classList.add("go")}
+ const later=(ms,fn)=>setTimeout(fn,ms);
+ let preP=1;
+ /* BEFORE the ten: from 13s the neon misfires (letters drop out, snap back with an overdrive pop, a white-hot front runs through them) */
+ function preFx(rem){const K=window.__bb;if(!K)return;preOn=true;const u=(13000-rem)/3000;
+  const f=Math.sin(rem/38)*Math.sin(rem/91)+.5*Math.sin(rem/17);
+  const p=f>(.95-.8*u)?.12+.5*Math.abs(Math.sin(rem/23)):1;
+  if(p===1&&preP<1){K.fx=1;if(u>.3)fxGo("fl",.28+.4*u,".35s");if(u>.55)fxGo("gl")}
+  preP=p;K.p=p;K.fx=(K.fx||0)*.88;
+  K.fc=u>.2?(((13000-rem)%850)/850)*7.5-1.2:-9;
+  K.hov=(u>.5&&Math.sin(rem/60)>0)?1:0}
+ function preEnd(){if(!preOn)return;preOn=false;preP=1;const K=window.__bb;if(K){K.p=1;K.hov=0;K.fx=0;K.fc=-9}}
+ /* AFTER zero: board un-blacks in a white flash, the letters ignite one by one with a white-hot front, shock waves ripple through, light sweeps across */
+ function doneFx(){const K=window.__bb;if(!K)return;faceOn=false;preOn=false;cancelAnimationFrame(ramp);placeFx();
+  face.classList.remove("on");fb.className="";delete face.dataset.s;const t0=performance.now(),k0=K.k;
+  fxGo("fl",1,".8s");fxGo("gl");later(1500,()=>fxGo("sw"));later(1650,()=>fxGo("fl",.55,".6s"));later(3750,()=>{fxGo("fl",.8,".9s");fxGo("sw")});later(4300,()=>fxGo("gl"));
+  const cl=(x)=>Math.max(0,Math.min(1,x));
+  (function f(now){const t=(now-t0)/1000;K.k=k0*Math.max(0,1-t/.12);
+   let p;if(t<1.6){p=cl(t/1.6);if(t<1&&Math.sin(t*70)<-.2)p*=.4}else if(t<3.8)p=1-.85*Math.pow(Math.max(0,Math.sin((t-1.8)*Math.PI*1.5)),2);else p=1;
+   K.p=cl(p);
+   let fc=-9;if(t<1.7)fc=5.5-4.5*cl(K.p/.86);else if(t>2.2&&t<3.5)fc=.4+(t-2.2)/1.3*5.2;K.fc=fc;
+   let x=Math.max(0,1-t);if(t>1.8&&t<3.9)x=Math.max(x,.9*Math.max(0,-Math.sin((t-1.8)*Math.PI*1.5)));if(t>=3.8)x=Math.max(x,.95*cl(1-(t-3.8)/1.0));K.fx=x;
+   K.hov=(t>1.2&&t<5.5)?1:0;
+   if(t<5.6)ramp=requestAnimationFrame(f);else{K.p=1;K.k=0;K.hov=0;K.fx=0;K.fc=-9}})(t0)}
+ function faceNum(n){fb.textContent=n;fb.className="";void fb.offsetWidth;face.dataset.s=n;fb.className="n"+n}
+ addEventListener("resize",()=>{if(faceOn)placeFace();placeFx()});
 
 
 
@@ -1505,12 +1583,18 @@ html.fshake #clip,html.fshake #bbs{animation:finShake .7s linear}
    const last10=rem<=10000;
    if(bbEl)bbEl.classList.toggle("t10",last10);
    if(rem<=12000&&window.__bbUpd)window.__bbUpd();
-   if(last10&&window.__bbIsOpen&&window.__bbIsOpen()){
-    root.classList.add("ten");const n=Math.ceil(rem/1000);
+   const opened=window.__bbIsOpen&&window.__bbIsOpen(),idle=window.__bbState&&window.__bbState()==="idle";
+   if(last10&&opened){
+    if(faceOn){faceStop();lastSec=-1}root.classList.add("ten");const n=Math.ceil(rem/1000);
     if(n!==lastSec){lastSec=n;tickNum(n)}}
-   else if(lastSec!==-1||root.classList.contains("ten"))clearNum();
+   else if(last10&&idle){
+    if(root.classList.contains("ten"))clearNum();
+    faceStart();const n=Math.ceil(rem/1000);if(n!==lastSec){lastSec=n;faceNum(n)}}
+   else{if(lastSec!==-1||root.classList.contains("ten"))clearNum();if(!last10||!idle)faceStop()}
+   if(!last10&&idle&&rem<=13000)preFx(rem);else if(!(last10&&idle))preEnd();
    return}
   fired=true;
+  if(faceOn&&window.__bbState&&window.__bbState()==="idle")doneFx();else{faceStop();preEnd()}
   if(waiting)finale();else{clearNum();pic(true,true)}
  }
  const loop=()=>{clockStep();if(!fired)requestAnimationFrame(loop)};requestAnimationFrame(loop);
