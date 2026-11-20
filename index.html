@@ -1278,7 +1278,30 @@ inp.addEventListener("input",pv);
 setInterval(()=>{if(!$("#bbs").classList.contains("on")||busy)return;api("/state").then(s=>{const ch=!S||s.msg!==S.msg;if(ch&&!inp.value.trim())paint(s,1);else stats(s)}).catch(()=>{})},15000);
 const load=()=>{if(API.includes("YOURNAME")){draw("YOUR AD HERE",COL[0],0);return st("Billboard is not connected yet. Set API in index.html to your Worker URL.","err")}return api("/state").then(s=>paint(s,0)).catch(()=>{draw("YOUR AD HERE",COL[0],0);st("Billboard is offline. Try again in a moment.","err")})};
 document.getElementById("bbHit").addEventListener("click",load);
-const lib=()=>window.solanaWeb3?0:new Promise((ok,no)=>{const e=document.createElement("script");e.src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.98.0/lib/index.iife.min.js";e.onload=ok;e.onerror=no;document.head.appendChild(e)});
+/* Load browser Buffer before Solana Web3.js.
+   The Web3 IIFE expects the Node Buffer API to exist in the browser. */
+const loadScript=url=>new Promise((ok,no)=>{
+ const e=document.createElement("script");
+ e.src=url;e.onload=ok;e.onerror=()=>no(new Error("Could not load required library: "+url));
+ document.head.appendChild(e);
+});
+let solanaLibPromise=null;
+const lib=()=>{
+ if(window.solanaWeb3)return Promise.resolve();
+ if(!solanaLibPromise){
+  solanaLibPromise=(async()=>{
+   if(!window.Buffer){
+    await loadScript("https://bundle.run/buffer@6.0.3");
+    const B=window.buffer&&(window.buffer.Buffer||window.buffer);
+    if(!B)throw new Error("Buffer polyfill loaded, but Buffer was not exposed.");
+    window.Buffer=B;
+   }
+   await loadScript("https://cdn.jsdelivr.net/npm/@solana/web3.js@1.98.0/lib/index.iife.min.js");
+   if(!window.solanaWeb3)throw new Error("Solana Web3.js loaded but its browser API was not exposed.");
+  })().catch(err=>{solanaLibPromise=null;throw err;});
+ }
+ return solanaLibPromise;
+};
 async function take(){
  if(busy)return;const msg=$("#tkIn").value.trim().toUpperCase();
  if(!/^[\x20-\x7E]{3,40}$/.test(msg)||/HTTPS?:|WWW\.|T\.ME|@|\.(COM|IO|XYZ|APP|FUN|GG)\b/.test(msg))return st("3-40 characters, no links.","err");
