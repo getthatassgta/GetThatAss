@@ -1240,6 +1240,17 @@ const BBVID="AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAvQbW9vdgAAAGxtdmhkAAA
 (function(){
 const API="https://gta-billboard.getthatassgta.workers.dev",COL=["#ff3fa4","#4fd8ff","#ffb36a","#7dffc2","#c58bff"];
 const $=s=>document.querySelector(s),msgEl=$("#tkMsg");if(!msgEl)return;let ci=0,S=null,busy=0,pay="burn";
+/* Mirror the current paid takeover message onto the real homepage billboard,
+   covering the old VICE CITY lettering without changing the takeover panel. */
+const mainStage=$("#stage"),mainAd=document.createElement("div");
+mainAd.id="liveAdFace";mainAd.setAttribute("aria-hidden","true");
+Object.assign(mainAd.style,{position:"absolute",left:"0",top:"0",width:"200px",height:"180px",zIndex:"8",display:"flex",alignItems:"center",justifyContent:"center",boxSizing:"border-box",padding:"12px",overflow:"hidden",pointerEvents:"none",textAlign:"center",textTransform:"uppercase",fontFamily:'Montserrat,"Arial Black",Arial,sans-serif',fontWeight:"900",fontStyle:"italic",lineHeight:"1.05",overflowWrap:"anywhere",color:"#ffe9f5",background:"radial-gradient(ellipse at center,#180817 0%,#07040b 78%)",border:"2px solid #ff5db8",boxShadow:"inset 0 0 22px #ff3fa455,0 0 12px #ff3fa455",textShadow:"0 0 5px currentColor,0 0 18px currentColor"});
+if(mainStage)mainStage.appendChild(mainAd);
+const mainAdStyle=document.createElement("style");mainAdStyle.textContent="body.bb-run #liveAdFace{opacity:0!important}";document.head.appendChild(mainAdStyle);
+const MAIN_Q=[[839,181],[1036,246],[1036,410],[838,374]];
+function placeMainAd(){if(!mainAd||!window.__bbHomog)return;const h=window.__bbHomog([[0,0],[200,0],[200,180],[0,180]],MAIN_Q);mainAd.style.transform="matrix3d("+[h[0],h[3],0,h[6],h[1],h[4],0,h[7],0,0,1,0,h[2],h[5],0,1].join(",")+")"}
+function showMainAd(s){if(!mainStage||!s||!s.msg)return;const message=String(s.msg).trim().slice(0,40);if(!message)return;mainAd.textContent=message;const n=message.length;mainAd.style.fontSize=(n<=10?"25px":n<=16?"21px":n<=24?"17px":"14px");const color=COL[s.color]||COL[0];mainAd.style.color=color;mainAd.style.borderColor=color;mainAd.style.boxShadow="inset 0 0 22px "+color+"55,0 0 12px "+color+"66";placeMainAd()}
+placeMainAd();window.addEventListener("resize",placeMainAd);
 const HINTS={burn:"One transaction burns the tokens and posts your message. You keep the sign until someone outbids you.",sol:"One transaction sends SOL to the project and posts your message. You keep the sign until someone outbids you."},NM=["Pink","Cyan","Amber","Mint","Violet"];
 const st=(t,k)=>{const e=$("#tkSt");e.textContent=t||HINTS[pay];e.className=t?(k||""):"hint"};st();
 const api=(p,b)=>fetch(API+p,b?{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(b)}:{}).then(r=>r.json());
@@ -1271,12 +1282,14 @@ function wal(pk){const on=!!pk;$("#walBtn").textContent=on?short(pk.toString()):
 $("#walBtn").addEventListener("click",async()=>{const ph=gph();if(!ph){window.open("https://phantom.com/download","_blank","noopener");return}if(ph.publicKey&&ph.isConnected)return;try{const r=await ph.connect();wal(r.publicKey)}catch(e){}});
 $("#walOut").addEventListener("click",async()=>{const ph=gph();try{await ph.disconnect()}catch(e){}wal(null)});
 {const ph=gph();if(ph){if(ph.on){ph.on("connect",wal);ph.on("disconnect",()=>wal(null));ph.on("accountChanged",pk=>wal(pk))}if(ph.isConnected&&ph.publicKey)wal(ph.publicKey);else ph.connect({onlyIfTrusted:true}).then(r=>wal(r.publicKey)).catch(()=>{})}}
-function paint(s,anim){stats(s);const go=()=>draw(s.msg,COL[s.color]||COL[0],0);if(anim){msgEl.className="out";setTimeout(go,700)}else go()}
+function paint(s,anim){stats(s);showMainAd(s);const go=()=>draw(s.msg,COL[s.color]||COL[0],0);if(anim){msgEl.className="out";setTimeout(go,700)}else go()}
 function pv(){const v=inp.value.toUpperCase();$("#tkN").textContent=v.length+"/40";$("#tkN").classList.toggle("lim",v.length>=36);if(v.trim())draw(v,COL[ci],1);else if(S)draw(S.msg,COL[S.color]||COL[0],0)}
 inp.addEventListener("input",pv);
 [...col.children].forEach(u=>u.addEventListener("click",pv));
-setInterval(()=>{if(!$("#bbs").classList.contains("on")||busy)return;api("/state").then(s=>{const ch=!S||s.msg!==S.msg;if(ch&&!inp.value.trim())paint(s,1);else stats(s)}).catch(()=>{})},15000);
+setInterval(()=>{if(busy)return;api("/state").then(s=>{showMainAd(s);if($("#bbs").classList.contains("on")){const ch=!S||s.msg!==S.msg;if(ch&&!inp.value.trim())paint(s,1);else stats(s)}}).catch(()=>{})},15000);
 const load=()=>{if(API.includes("YOURNAME")){draw("YOUR AD HERE",COL[0],0);return st("Billboard is not connected yet. Set API in index.html to your Worker URL.","err")}return api("/state").then(s=>paint(s,0)).catch(()=>{draw("YOUR AD HERE",COL[0],0);st("Billboard is offline. Try again in a moment.","err")})};
+/* Fetch the live ad on page load too, not only after the billboard is clicked. */
+load();
 document.getElementById("bbHit").addEventListener("click",load);
 /* Load browser Buffer before Solana Web3.js.
    The Web3 IIFE expects the Node Buffer API to exist in the browser. */
