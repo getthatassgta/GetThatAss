@@ -505,6 +505,12 @@ html body #bbs .bb-ui.tkui{padding:clamp(54px,7.5vh,72px) 14px 12px!important;ov
 #tkGo{min-height:46px;padding:11px 18px;font-size:16px}
 #tkSt{font-size:13px;min-height:1.2em}
 #wal{right:max(44px,env(safe-area-inset-right))}
+/* ===== "Go back": the panel powers off like a neon sign (collapses to a glowing line) so it is gone before the main page returns ===== */
+@keyframes tkOff{0%{transform:scale(1,1);opacity:1}40%{transform:scale(1,.014);opacity:1}72%{transform:scale(.03,.014);opacity:1}100%{transform:scale(0,0);opacity:0}}
+#bbs.bbx #tk{transform-origin:50% 50%!important;animation:tkOff .55s cubic-bezier(.55,0,.8,.4) forwards;pointer-events:none;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;background:#12081cf2!important;box-shadow:0 0 28px 2px var(--c)!important}
+#bbs.bbx .bb-ui{transition:opacity .2s .4s!important}
+#bbs.bbx .finbuy{opacity:0!important;transition:opacity .2s!important}
+#bbs.bbx .bb-back{opacity:0!important;transition:opacity .2s!important}
 </style>
 </head>
 <body>
@@ -558,7 +564,7 @@ html body #bbs .bb-ui.tkui{padding:clamp(54px,7.5vh,72px) 14px 12px!important;ov
 </div></div>
 <div id="bbTip" aria-hidden="true"><u class="p"></u><u class="d"></u><u class="r"></u><span>Enter</span></div>
 <div id="bbs" role="dialog" aria-modal="true" aria-label="Vice City billboard" aria-hidden="true">
- <div class="bb-bg"><video id="bbVid" muted loop playsinline preload="auto" disablepictureinpicture tabindex="-1"></video></div><div class="bb-vg"></div>
+ <div class="bb-bg"><div id="bbVid" style="display:none"></div></div><div class="bb-vg"></div>
  <div class="bb-ui tkui"><div class="bb-clock" role="timer" aria-live="off">
    <div class="u" style="--i:0"><b data-k="d">00</b><small>Days</small></div><span class="c" style="--i:0">:</span>
    <div class="u" style="--i:1"><b data-k="h">00</b><small>Hours</small></div><span class="c" style="--i:1">:</span>
@@ -1419,20 +1425,28 @@ function paintMainAd(s){
  if(!message)return;
  const color=COL[Number(s.color)]||COL[0],g=mainCtx;
  window.__adOwnerColor=color;try{syncBillboardCursorColor()}catch(e){}
- const quad=ctx=>{ctx.beginPath();[MAIN_TL,MAIN_TR,MAIN_BR,MAIN_BL].forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath()};
+ /* rounded corners + a real bezel: outer frame (rounded), inner lit panel inset from it */
+ const OUTER=[MAIN_TL,MAIN_TR,MAIN_BR,MAIN_BL];
+ const mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];
+ const rq=(ctx,P,r)=>{ctx.beginPath();const m=mid(P[0],P[1]);ctx.moveTo(m[0],m[1]);for(let i=1;i<=P.length;i++){const p=P[i%P.length],q=P[(i+1)%P.length],m2=mid(p,q);ctx.arcTo(p[0],p[1],m2[0],m2[1],r)}ctx.closePath()};
+ const inset=(P,d)=>{const n=P.length,cx=P.reduce((s,p)=>s+p[0],0)/n,cy=P.reduce((s,p)=>s+p[1],0)/n,L=[];
+  for(let i=0;i<n;i++){const a=P[i],b=P[(i+1)%n],dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy);let nx=-dy/len,ny=dx/len;if(nx*(cx-a[0])+ny*(cy-a[1])<0){nx=-nx;ny=-ny}L.push([a[0]+nx*d,a[1]+ny*d,dx,dy])}
+  return L.map((l,i)=>{const m=L[(i+n-1)%n],det=m[2]*l[3]-m[3]*l[2],t=((l[0]-m[0])*l[3]-(l[1]-m[1])*l[2])/det;return[m[0]+m[2]*t,m[1]+m[3]*t]})};
+ const INNER=inset(OUTER,7);
+ const quad=ctx=>rq(ctx,OUTER,9);
  /* ---------- sign face: same position, size and perspective as the original sign; just a deep black panel ---------- */
  g.setTransform(R,0,0,R,0,0);g.clearRect(0,0,1672,941);
  g.save();quad(g);
  const face=g.createLinearGradient(0,172,0,416);
- face.addColorStop(0,"#3a1d36");face.addColorStop(.5,"#52243f");face.addColorStop(1,"#6b2e42");
+ face.addColorStop(0,"#31232c");face.addColorStop(.5,"#2b1f28");face.addColorStop(1,"#33232c");
  g.fillStyle=face;g.fill();g.clip();
- const warm=g.createRadialGradient(1040,420,10,1040,420,260);warm.addColorStop(0,"#ff7a5a42");warm.addColorStop(1,"#ff7a5a00");g.fillStyle=warm;g.fillRect(820,160,230,270);
- const pool=g.createRadialGradient(936,300,8,936,300,190);pool.addColorStop(0,color+"55");pool.addColorStop(.55,color+"28");pool.addColorStop(1,color+"00");g.fillStyle=pool;g.fillRect(820,160,230,270);
+ const warm=g.createRadialGradient(1040,420,10,1040,420,260);warm.addColorStop(0,"#ff7a5a1a");warm.addColorStop(1,"#ff7a5a00");g.fillStyle=warm;g.fillRect(820,160,230,270);
+ const pool=g.createRadialGradient(936,300,8,936,300,190);pool.addColorStop(0,color+"3c");pool.addColorStop(.55,color+"1c");pool.addColorStop(1,color+"00");g.fillStyle=pool;g.fillRect(820,160,230,270);
  const edge=g.createRadialGradient(936,300,110,936,300,250);edge.addColorStop(0,"#1a0a1800");edge.addColorStop(1,"#1a0a1855");g.fillStyle=edge;g.fillRect(820,160,230,270);
- const sheen=g.createLinearGradient(0,172,0,300);sheen.addColorStop(0,"#ffffff22");sheen.addColorStop(1,"#ffffff00");
+ const sheen=g.createLinearGradient(0,172,0,300);sheen.addColorStop(0,"#ffffff0f");sheen.addColorStop(1,"#ffffff00");
  g.fillStyle=sheen;g.fillRect(820,160,230,150);
  /* ---------- Vice City style neon script, supersampled and centred by its real ink bounds ---------- */
- const OW=840,OH=720,MAXW=700,MAXH=590,off=document.createElement("canvas");off.width=OW*SO;off.height=OH*SO;
+ const OW=840,OH=720,MAXW=640,MAXH=520,off=document.createElement("canvas");off.width=OW*SO;off.height=OH*SO;
  const c=off.getContext("2d");c.scale(SO,SO);
  const text=message;
  c.textAlign="left";c.textBaseline="alphabetic";c.lineJoin="round";c.lineCap="round";
@@ -1465,6 +1479,7 @@ function paintMainAd(s){
   const um=((sx0+x)/2)/TW,top=MAIN_TL[1]+(MAIN_TR[1]-MAIN_TL[1])*um,bottom=MAIN_BL[1]+(MAIN_BR[1]-MAIN_BL[1])*um;
   g.drawImage(off,sx0,0,x-sx0,OH*SO,dx0/R,top,Math.max(1,dx1-dx0)/R,bottom-top);sx0=x;dx0=dx1;
  }
+ quad(g);g.lineWidth=3;g.strokeStyle="#1a0d1899";g.stroke();g.beginPath();g.moveTo(MAIN_TL[0]+9,MAIN_TL[1]+1.4);g.lineTo(MAIN_TR[0]-9,MAIN_TR[1]+1.4);g.lineWidth=1;g.strokeStyle="#ffffff24";g.stroke();
  g.restore();
  /* ---------- soft light spilled on the scene (separate canvas so it can breathe); no outline added to the frame ---------- */
  const k=glowCtx;k.clearRect(0,0,1672,941);
@@ -2063,6 +2078,11 @@ function fit(){tk.style.transform="";tk.style.marginBottom="";const cs=getComput
 const later=()=>{requestAnimationFrame(fit);setTimeout(fit,450)};
 new MutationObserver(later).observe(bbs,{attributes:true,attributeFilter:["class"]});
 addEventListener("resize",later);if(window.ResizeObserver)new ResizeObserver(()=>requestAnimationFrame(fit)).observe(tk);
+/* go-back effect: tag the overlay the moment it starts closing, clear the tag once it is fully closed */
+const out=()=>{const s=window.__bbState&&window.__bbState();if(s==="open"||s==="closing")bbs.classList.add("bbx")};
+const bk=bbs.querySelector(".bb-back");if(bk)bk.addEventListener("click",out,true);
+addEventListener("keydown",e=>{if(e.key==="Escape")out()},true);
+new MutationObserver(()=>{if(bbs.classList.contains("bbx")&&!bbs.classList.contains("run"))bbs.classList.remove("bbx")}).observe(bbs,{attributes:true,attributeFilter:["class"]});
 })();
 </script>
 </body>
